@@ -1,0 +1,10 @@
+# Clippy linting configuration
+# Warn on common mistakes and style issues
+msrv = "1.70.0"
+
+# Allowed lints (less noisy)
+allow-unwrap-in-tests = true
+allow-dbg-in-tests = true
+
+# Cognitive complexity threshold
+cognitive-complexity-threshold = 30
