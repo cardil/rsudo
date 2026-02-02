@@ -279,6 +279,15 @@ $ rsudo reboot
 🔐 Requesting approval...
 ```
 
+### Machine ID Generation
+
+| Platform | Source |
+|----------|--------|
+| Linux | `/etc/machine-id` (systemd) |
+| macOS | `IOPlatformUUID` from IOKit |
+| Windows | `MachineGuid` from registry |
+| Fallback | Generated UUID persisted to `~/.cache/rsudo/machine_id` |
+
 ### Approver Authorization
 
 The server maintains a mapping of which approvers can approve requests from which machine groups (configurable via Web UI or API):
@@ -555,6 +564,16 @@ The web dashboard supports browser push notifications for approvers who don't ha
 - VAPID keys for push subscription authentication
 - User grants notification permission on first visit
 - Works on desktop browsers (Chrome, Firefox, Edge, Safari)
+
+**Notification content tiers:**
+
+| Tier | Content | Default |
+|------|---------|---------|
+| Minimal | "New rsudo request pending" | ✓ |
+| Partial | "Request from [hostname]" | |
+| Full | Command, user, hostname (E2E encrypted) | |
+
+Approvers configure via Web UI: Profile → Notification Preferences
 
 ### Approver Pre-Authentication
 

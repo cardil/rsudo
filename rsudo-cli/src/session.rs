@@ -163,6 +163,63 @@ pub fn delete_session() -> Result<(), SessionError> {
     Ok(())
 }
 
+/// Get platform-native machine ID
+fn get_platform_machine_id() -> Option<String> {
+    // Linux: /etc/machine-id (systemd)
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(id) = fs::read_to_string("/etc/machine-id") {
+            let trimmed = id.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.to_string());
+            }
+        }
+    }
+
+    // macOS: IOPlatformUUID via system_profiler
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(output) = std::process::Command::new("ioreg")
+            .args(["-rd1", "-c", "IOPlatformExpertDevice"])
+            .output()
+        {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                if line.contains("IOPlatformUUID") {
+                    if let Some(uuid) = line.split('"').nth(3) {
+                        return Some(uuid.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    // Windows: MachineGuid from registry
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(output) = std::process::Command::new("reg")
+            .args([
+                "query",
+                r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography",
+                "/v",
+                "MachineGuid",
+            ])
+            .output()
+        {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                if line.contains("MachineGuid") {
+                    if let Some(guid) = line.split_whitespace().last() {
+                        return Some(guid.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
 /// Load or generate machine ID
 pub fn load_or_generate_machine_id() -> Result<String, SessionError> {
     let path = machine_id_file()?;
@@ -171,8 +228,9 @@ pub fn load_or_generate_machine_id() -> Result<String, SessionError> {
         // Load existing machine ID
         Ok(fs::read_to_string(&path)?.trim().to_string())
     } else {
-        // Generate new machine ID
-        let machine_id = uuid::Uuid::new_v4().to_string();
+        // Try platform-native ID first, fallback to generated UUID
+        let machine_id =
+            get_platform_machine_id().unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
         // Create directory if needed
         let dir = session_dir()?;
