@@ -1,20 +1,26 @@
 //! Core library for rsudo
 //!
-//! Provides cryptographic primitives, types, and SSR token handling.
+//! Provides cryptographic primitives, types, and SSR (Sudo Sign Request) token handling.
 
 #![warn(missing_docs)]
 
-/// Placeholder module for future implementation
-pub fn placeholder() {
-    println!("rsudo-core placeholder");
-}
+/// Configuration loading and merging
+pub mod config;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// Cryptographic operations (Ed25519)
+pub mod crypto;
 
-    #[test]
-    fn test_placeholder() {
-        placeholder();
-    }
-}
+/// SSR (Sudo Sign Request) token format
+pub mod ssr;
+
+/// Core types and data structures
+pub mod types;
+
+// Re-export commonly used types
+pub use config::{ConfigError, ConfigLoader};
+pub use crypto::{CryptoError, Keypair, PublicKey};
+pub use ssr::{SignRequestToken, SsrError};
+pub use types::{
+    AuditConfig, ClientConfig, Config, PolicyConfig, RequestConfig, ServerConfig, SignRequest,
+    SignedApproval,
+};

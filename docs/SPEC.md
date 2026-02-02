@@ -30,10 +30,10 @@
 ```
 Hanging Mode:                          SSR Mode:
 Agent → rsudo reboot                   Agent → rsudo --ssr reboot
-     → Server → Approver                    → Print SSR token
-     ← Approval ←                           ... time passes ...
-     → Execute                         Agent → rsudo --signed <token>
-                                            → Execute
+      → Server → Approver                    → Print SSR token
+      ← Approval ←                           ... time passes ...
+      → Execute                        Agent → rsudo --signed <token>
+                                             → Execute
 ```
 
 ---
@@ -88,6 +88,47 @@ sequenceDiagram
 | Replay attacks | Nonce + timestamp + expiration |
 | MITM | TLS + message-level signatures |
 | Privilege escalation | Respect local sudoers config |
+| Environment injection | Sanitize env vars when running as root |
+| Forged privileged invocation | Transaction ID binding between phases |
+
+### Privilege Execution
+
+rsudo uses `sudo` with `NOPASSWD` for privilege escalation. The binary runs unprivileged for approval, then re-invokes itself with elevated privileges to execute the approved command.
+
+**Two-Phase Execution:**
+
+```
+Phase 1 (unprivileged):          Phase 2 (privileged):
+rsudo reboot                     RSUDO_TXN=<id> sudo rsudo reboot
+  → Request approval               → Detect RSUDO_TXN env var
+  → Receive signed approval        → Lookup transaction by RSUDO_TXN
+  → Store approval + transaction   → Verify command matches approval
+  → Exec with RSUDO_TXN env var    → Re-validate approval signature
+                                   → Execute target command as root
+```
+
+**Re-invocation rationale**: The unprivileged phase handles network I/O and cryptographic validation without root access. Only after approval is verified does rsudo escalate privileges via sudo for actual command execution.
+
+**Command in re-invocation**: The actual command is passed to the privileged phase for audit visibility (appears in logs, `ps`, etc.). rsudo verifies the command matches the approved transaction before execution.
+
+**Phase detection**: Presence of `RSUDO_TXN` env var indicates privileged phase. Transaction details (including original user) are retrieved from stored approval data.
+
+**Transaction ID**: A cryptographically random ID passed via `RSUDO_TXN` env var binds the two phases. The unprivileged phase stores the approval with this ID; the privileged phase retrieves and re-validates it. This prevents attackers from forging privileged invocations.
+
+**Sudoers configuration** (`/etc/sudoers.d/rsudo`):
+
+```bash
+# RHEL/Fedora/CentOS (wheel group)
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/rsudo
+
+# Debian/Ubuntu (sudo group)
+%sudo ALL=(ALL) NOPASSWD: /usr/bin/rsudo
+```
+
+**Security guarantees:**
+- Approval signature re-validated in privileged phase (prevents TOCTOU attacks)
+- Environment variables sanitized before executing target command
+- Audit logging to `/var/log/rsudo/audit.log` and syslog
 
 ### Cryptography
 
@@ -257,15 +298,48 @@ ApproverSig: jkl012...
 
 ## 6. Configuration
 
-### Client Config (`~/.config/rsudo/config.toml`)
+### Configuration Model
+
+rsudo uses layered configuration with three sources:
+
+| Config | Location | Purpose | Permissions |
+|--------|----------|---------|-------------|
+| **System** | `/etc/rsudo/config.toml` | Server URL, CA certs, policy, audit | `root:root 644` |
+| **Drop-in** | `/etc/rsudo.d/*.toml` | Additional system config (automation-friendly) | `root:root 644` |
+| **User** | `~/.config/rsudo/config.toml` | Client keys, personal preferences | User-owned |
+
+**Merging order** (later overrides earlier):
+1. `/etc/rsudo/config.toml` (base)
+2. `/etc/rsudo.d/*.toml` (alphabetical order)
+3. `~/.config/rsudo/config.toml` (user)
+
+**Merging rules:**
+- System config provides defaults
+- Drop-in configs extend/override system settings (useful for config management tools)
+- User config can override non-security settings
+- **Security-critical fields** (server URL, policy, CA certs) cannot be overridden by user config
+
+### System Config (`/etc/rsudo/config.toml`)
 
 ```toml
 [server]
-url = "https://rsudo.example.com"
-timeout = 30
+url = "https://rsudo.example.com"    # Cannot be overridden
+ca_cert = "/etc/rsudo/ca.crt"
 
+[policy]
+allowed_commands = ["*"]             # Cannot be overridden
+require_tty = false
+
+[audit]
+log_file = "/var/log/rsudo/audit.log"
+syslog = true
+```
+
+### User Config (`~/.config/rsudo/config.toml`)
+
+```toml
 [client]
-key_file = "~/.rsudo/client.key"
+key_file = "~/.config/rsudo/client.key"
 
 [request]
 default_timeout = 300
@@ -326,11 +400,30 @@ serde = "1"           # Serialization
 # From source
 cargo install rsudo
 
-# Binary release
-curl -LO https://github.com/.../rsudo-linux-x86_64.tar.gz
-tar xzf rsudo-linux-x86_64.tar.gz
-sudo install -m 755 rsudo /usr/local/bin/
+# Debian/Ubuntu
+sudo apt install ./rsudo_*.deb
+
+# RHEL/Fedora/CentOS
+sudo dnf install ./rsudo-*.rpm
+
+# Alpine Linux
+sudo apk add ./rsudo-*.apk
+
+# Arch Linux (AUR)
+yay -S rsudo
+
+# Nix
+nix profile install nixpkgs#rsudo
+
+# macOS (Homebrew)
+brew install rsudo/tap/rsudo
 ```
+
+Packages handle:
+- Binary installation to `/usr/bin/rsudo` (Linux) or package-specific prefix with correct ownership
+- Sudoers configuration in `/etc/sudoers.d/rsudo`
+- System config directory `/etc/rsudo/` and drop-in `/etc/rsudo.d/`
+- Audit log directory `/var/log/rsudo/`
 
 ### Server Deployment
 
