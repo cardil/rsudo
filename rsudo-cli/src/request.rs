@@ -237,14 +237,23 @@ pub async fn submit_hanging_request(
     println!("   User: {}", request.username);
 
     // Submit request
-    let response: RequestSubmissionResponse = client
+    let resp = client
         .post(format!("{}/api/requests", server_url))
         .bearer_auth(&session.access_token)
         .json(request)
         .send()
-        .await?
-        .json()
         .await?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        return Err(RequestError::ServerError(format!(
+            "Request submission failed ({}): {}",
+            status, body
+        )));
+    }
+
+    let response: RequestSubmissionResponse = resp.json().await?;
 
     println!("   Request ID: {}", response.request_id);
     println!("\n⏳ Waiting for approval ({}s timeout)...", timeout);
@@ -336,7 +345,14 @@ pub fn generate_ssr_token(
 
     if let Some(path) = output {
         std::fs::write(path, &pem)?;
-        println!("✅ SSR token written to: {}", path.display());
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = std::fs::metadata(path)?.permissions();
+            perms.set_mode(0o600);
+            std::fs::set_permissions(path, perms)?;
+        }
+        eprintln!("✅ SSR token written to: {}", path.display());
     } else {
         println!("{}", pem);
     }
