@@ -280,7 +280,7 @@ mod tests {
         let result = SignRequestToken::from_pem(&pem);
         assert!(result.is_err());
     }
-    
+
     #[test]
     fn test_invalid_pem_missing_fields() {
         // JSON with missing required fields
@@ -293,7 +293,7 @@ mod tests {
         let result = SignRequestToken::from_pem(&pem);
         assert!(result.is_err());
     }
-    
+
     #[test]
     fn test_invalid_pem_wrong_structure() {
         // Valid JSON but wrong structure

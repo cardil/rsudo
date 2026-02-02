@@ -10,31 +10,31 @@ use std::collections::HashMap;
 pub struct SignRequest {
     /// The command to execute
     pub command: String,
-    
+
     /// Command arguments
     pub args: Vec<String>,
-    
+
     /// Hostname where command will execute
     pub hostname: String,
-    
+
     /// Username requesting execution
     pub username: String,
-    
+
     /// Working directory for command execution
     pub cwd: String,
-    
+
     /// Environment variables
     pub env: HashMap<String, String>,
-    
+
     /// Request timestamp (ISO 8601 UTC)
     pub timestamp: String,
-    
+
     /// Expiration timestamp (ISO 8601 UTC)
     pub expires_at: String,
-    
+
     /// Unique nonce for replay prevention and request tracking (UUID v4)
     pub nonce: String,
-    
+
     /// Client identifier (public key fingerprint)
     pub client_id: String,
 }
@@ -169,7 +169,7 @@ mod tests {
     fn test_sign_request_serialization() {
         let mut env = HashMap::new();
         env.insert("PATH".to_string(), "/usr/bin".to_string());
-        
+
         let request = SignRequest {
             command: "reboot".to_string(),
             args: vec![],
@@ -182,10 +182,10 @@ mod tests {
             nonce: "abc123".to_string(),
             client_id: "client-001".to_string(),
         };
-        
+
         let json = serde_json::to_string(&request).unwrap();
         let deserialized: SignRequest = serde_json::from_str(&json).unwrap();
-        
+
         assert_eq!(request, deserialized);
     }
 
