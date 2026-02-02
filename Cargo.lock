@@ -1294,11 +1294,13 @@ dependencies = [
  "rsudo-core",
  "serde",
  "serde_json",
+ "temp-env",
  "thiserror",
  "tokio",
  "toml",
  "tracing",
  "tracing-subscriber",
+ "users",
  "uuid",
  "webbrowser",
 ]
@@ -1665,6 +1667,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "temp-env"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96374855068f47402c3121c6eed88d29cb1de8f3ab27090e273e420bdabcf050"
+dependencies = [
+ "parking_lot",
+]
+
+[[package]]
 name = "tempfile"
 version = "3.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1928,6 +1939,16 @@ dependencies = [
  "idna",
  "percent-encoding",
  "serde",
+]
+
+[[package]]
+name = "users"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "24cc0f6d6f267b73e5a2cadf007ba8f9bc39c6a6f9666f8cf25ea809a153b032"
+dependencies = [
+ "libc",
+ "log",
 ]
 
 [[package]]

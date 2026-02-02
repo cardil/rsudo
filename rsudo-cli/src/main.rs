@@ -278,19 +278,20 @@ async fn handle_rsudoctl() -> i32 {
         }
     };
 
-    // Get server URL from config
-    let server_url = match config.server.url.as_ref() {
-        Some(url) => url.clone(),
-        None => {
-            eprintln!("rsudoctl: error: server URL not configured");
-            eprintln!("Set server URL in /etc/rsudo/config.toml");
-            return 4;
-        }
-    };
-
-    // Handle subcommands
+    // Handle subcommands - only login requires server_url
     match args.command {
-        RsudoctlCommand::Login { token } => handle_login(token, &server_url).await,
+        RsudoctlCommand::Login { token } => {
+            // Defer server_url check to when it's actually needed
+            let server_url = match config.server.url.as_ref() {
+                Some(url) => url.clone(),
+                None => {
+                    eprintln!("rsudoctl: error: server URL not configured");
+                    eprintln!("Set server URL in /etc/rsudo/config.toml");
+                    return 4;
+                }
+            };
+            handle_login(token, &server_url).await
+        }
         RsudoctlCommand::Logout => handle_logout(),
         RsudoctlCommand::Status => handle_status(),
         RsudoctlCommand::Config { command } => handle_config(command),

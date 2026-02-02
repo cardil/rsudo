@@ -57,6 +57,15 @@ pub fn store_transaction(request: &SignRequest, signed_token: &str) -> Result<St
     let txn_dir = std::env::temp_dir().join("rsudo-txn");
     std::fs::create_dir_all(&txn_dir)?;
 
+    // Set restrictive permissions on the directory (Unix only)
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = std::fs::metadata(&txn_dir)?.permissions();
+        perms.set_mode(0o700); // rwx------
+        std::fs::set_permissions(&txn_dir, perms)?;
+    }
+
     let txn_file = txn_dir.join(&txn_id);
     let txn = Transaction {
         request: request.clone(),
@@ -82,6 +91,15 @@ pub fn store_transaction(request: &SignRequest, signed_token: &str) -> Result<St
 
 /// Load transaction from storage
 pub fn load_transaction(txn_id: &str) -> Result<Transaction, ExecError> {
+    // Validate txn_id is a valid UUID to prevent path traversal attacks
+    // (e.g., "../../../etc/passwd" could be used to delete arbitrary files)
+    if uuid::Uuid::parse_str(txn_id).is_err() {
+        return Err(ExecError::InvalidTransaction(format!(
+            "Invalid transaction ID format: {}",
+            txn_id
+        )));
+    }
+
     let txn_file = std::env::temp_dir().join("rsudo-txn").join(txn_id);
 
     if !txn_file.exists() {
@@ -139,13 +157,14 @@ pub fn execute_privileged(txn_id: &str) -> Result<(), ExecError> {
         ));
     }
 
-    // Check if request has expired
-    if let Ok(expires_at) = chrono::DateTime::parse_from_rfc3339(&request.expires_at) {
-        if chrono::Utc::now() > expires_at {
-            return Err(ExecError::InvalidTransaction(
-                "Request has expired".to_string(),
-            ));
-        }
+    // Check if request has expired (fail on parse error to prevent execution of malformed requests)
+    let expires_at = chrono::DateTime::parse_from_rfc3339(&request.expires_at)
+        .map_err(|e| ExecError::InvalidTransaction(format!("Invalid expiry timestamp: {}", e)))?;
+
+    if chrono::Utc::now() > expires_at {
+        return Err(ExecError::InvalidTransaction(
+            "Request has expired".to_string(),
+        ));
     }
 
     // Sanitize environment before execution
@@ -206,24 +225,25 @@ mod tests {
 
     #[test]
     fn test_is_privileged_phase() {
-        // Should be false in test environment
-        assert!(!is_privileged_phase());
+        // Use temp_env for thread-safe env var manipulation
+        temp_env::with_var_unset("RSUDO_TXN", || {
+            assert!(!is_privileged_phase());
+        });
 
-        // Set the env var
-        std::env::set_var("RSUDO_TXN", "test-txn-123");
-        assert!(is_privileged_phase());
-
-        std::env::remove_var("RSUDO_TXN");
+        temp_env::with_var("RSUDO_TXN", Some("test-txn-123"), || {
+            assert!(is_privileged_phase());
+        });
     }
 
     #[test]
     fn test_get_transaction_id() {
-        assert!(get_transaction_id().is_none());
+        temp_env::with_var_unset("RSUDO_TXN", || {
+            assert!(get_transaction_id().is_none());
+        });
 
-        std::env::set_var("RSUDO_TXN", "test-txn-456");
-        assert_eq!(get_transaction_id(), Some("test-txn-456".to_string()));
-
-        std::env::remove_var("RSUDO_TXN");
+        temp_env::with_var("RSUDO_TXN", Some("test-txn-456"), || {
+            assert_eq!(get_transaction_id(), Some("test-txn-456".to_string()));
+        });
     }
 
     #[test]

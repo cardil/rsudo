@@ -84,12 +84,27 @@ pub async fn login_interactive(server_url: &str) -> Result<Session, LoginError> 
 
     // Step 1: Request device code
     println!("🔐 Starting OAuth device code flow...");
-    let device_response: DeviceCodeResponse = client
+    let response = client
         .post(format!("{}/api/oauth/device", server_url))
         .send()
-        .await?
-        .json()
         .await?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unable to read response body".to_string());
+        return Err(LoginError::OAuthFailed(format!(
+            "Device code request failed ({}): {}",
+            status, body
+        )));
+    }
+
+    let device_response: DeviceCodeResponse = response
+        .json()
+        .await
+        .map_err(|e| LoginError::OAuthFailed(format!("Invalid device code response: {}", e)))?;
 
     // Step 2: Display code to user and open browser
     println!("\n🔑 Your verification code: {}", device_response.user_code);
@@ -160,14 +175,28 @@ pub async fn login_with_token(server_url: &str, token: &str) -> Result<Session, 
         machine_id,
     };
 
-    let token_response: TokenResponse = client
+    let response = client
         .post(format!("{}/api/enroll", server_url))
         .json(&enrollment_req)
         .send()
-        .await?
+        .await?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unable to read response body".to_string());
+        return Err(LoginError::TokenInvalid(format!(
+            "Enrollment failed ({}): {}",
+            status, body
+        )));
+    }
+
+    let token_response: TokenResponse = response
         .json()
         .await
-        .map_err(|e| LoginError::TokenInvalid(e.to_string()))?;
+        .map_err(|e| LoginError::TokenInvalid(format!("Invalid enrollment response: {}", e)))?;
 
     // Step 5: Create and save session
     let session = create_session_from_token(token_response)?;

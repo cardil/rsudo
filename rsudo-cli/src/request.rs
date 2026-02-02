@@ -88,9 +88,11 @@ pub fn build_sign_request(
         .to_string_lossy()
         .to_string();
 
-    let username = std::env::var("USER")
-        .or_else(|_| std::env::var("USERNAME"))
-        .unwrap_or_else(|_| "unknown".to_string());
+    // Use system-level API instead of environment variables for security
+    // (env vars can be spoofed, but getuid/getpwuid_r cannot)
+    let username = users::get_current_username()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| "unknown".to_string());
 
     let cwd = std::env::current_dir()
         .map_err(|e| {

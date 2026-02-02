@@ -124,17 +124,17 @@ pub fn load_session() -> Result<Session, SessionError> {
 pub fn save_session(session: &Session) -> Result<(), SessionError> {
     let dir = session_dir()?;
 
-    // Create directory if it doesn't exist
-    fs::create_dir_all(&dir)?;
-
-    // Set restrictive permissions on the directory (Unix only)
+    // Create directory with restrictive permissions to avoid TOCTOU window
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = fs::metadata(&dir)?.permissions();
-        perms.set_mode(0o700); // rwx------
-        fs::set_permissions(&dir, perms)?;
+        use std::os::unix::fs::DirBuilderExt;
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700) // rwx------
+            .create(&dir)?;
     }
+    #[cfg(not(unix))]
+    fs::create_dir_all(&dir)?;
 
     let path = session_file()?;
     let contents = serde_json::to_string_pretty(session)?;
