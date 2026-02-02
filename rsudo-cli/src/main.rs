@@ -1,6 +1,7 @@
 //! rsudo CLI - Remote sudo with human-in-the-loop approval
 
 mod args;
+mod config;
 mod exec;
 mod login;
 mod request;
@@ -386,30 +387,8 @@ fn handle_status() -> i32 {
 /// Handle config commands
 fn handle_config(command: ConfigCommand) -> i32 {
     match command {
-        ConfigCommand::Show => {
-            let loader = ConfigLoader::new();
-            match loader.load() {
-                Ok(config) => match toml::to_string_pretty(&config) {
-                    Ok(toml_str) => {
-                        println!("{}", toml_str);
-                        0
-                    }
-                    Err(e) => {
-                        eprintln!("rsudoctl: failed to serialize config: {}", e);
-                        3
-                    }
-                },
-                Err(e) => {
-                    eprintln!("rsudoctl: failed to load config: {}", e);
-                    4
-                }
-            }
-        }
-        ConfigCommand::Set { key, value } => {
-            eprintln!("rsudoctl: config set not yet implemented");
-            eprintln!("Please edit ~/.config/rsudo/config.toml manually");
-            eprintln!("Set: {} = {}", key, value);
-            1
-        }
+        ConfigCommand::Show => config::show_config(),
+        ConfigCommand::Get { key } => config::get_config(&key),
+        ConfigCommand::Set { key, value } => config::set_config(&key, &value),
     }
 }

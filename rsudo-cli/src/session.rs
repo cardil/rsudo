@@ -124,14 +124,19 @@ pub fn load_session() -> Result<Session, SessionError> {
 pub fn save_session(session: &Session) -> Result<(), SessionError> {
     let dir = session_dir()?;
 
-    // Create directory with restrictive permissions to avoid TOCTOU window
+    // Create directory with restrictive permissions
     #[cfg(unix)]
     {
         use std::os::unix::fs::DirBuilderExt;
+        use std::os::unix::fs::PermissionsExt;
         std::fs::DirBuilder::new()
             .recursive(true)
             .mode(0o700) // rwx------
             .create(&dir)?;
+        // Enforce permissions on existing directories (DirBuilder won't tighten)
+        let mut perms = fs::metadata(&dir)?.permissions();
+        perms.set_mode(0o700);
+        fs::set_permissions(&dir, perms)?;
     }
     #[cfg(not(unix))]
     fs::create_dir_all(&dir)?;

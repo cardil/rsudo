@@ -138,6 +138,12 @@ pub enum ConfigCommand {
     /// Display current configuration
     Show,
 
+    /// Get a configuration value
+    Get {
+        /// Configuration key (e.g., request.default_timeout)
+        key: String,
+    },
+
     /// Set a configuration value (user-level only)
     Set {
         /// Configuration key (e.g., request.default_timeout)
