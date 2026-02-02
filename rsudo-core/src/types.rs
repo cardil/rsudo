@@ -137,6 +137,25 @@ impl Default for RequestConfig {
     }
 }
 
+/// Environment variable allowlist configuration
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EnvAllowlistConfig {
+    /// List of allowed environment variable names/patterns
+    pub allowlist: Option<Vec<String>>,
+
+    /// Whether to warn about filtered environment variables
+    pub warn: Option<bool>,
+}
+
+impl Default for EnvAllowlistConfig {
+    fn default() -> Self {
+        Self {
+            allowlist: None, // Use built-in defaults if not specified
+            warn: Some(true),
+        }
+    }
+}
+
 /// Complete rsudo configuration
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct Config {
@@ -159,6 +178,10 @@ pub struct Config {
     /// Request configuration
     #[serde(default)]
     pub request: RequestConfig,
+
+    /// Environment variable allowlist configuration
+    #[serde(default)]
+    pub env: EnvAllowlistConfig,
 }
 
 #[cfg(test)]

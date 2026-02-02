@@ -9,9 +9,10 @@
 | 1. Setup | - | S | Rust workspace, CI, project structure |
 | 2. Core lib | Phase 1 | M | Crypto, types, SSR format, config parsing |
 | 3. CLI | Phase 2 | M | `rsudo` binary with all commands |
-| 4. Server | Phase 2 | L | Approval server with REST + WebSocket |
-| 5. Approver UI | Phase 4 | M | Web dashboard for approve/reject |
-| 6. Integration | All | S | E2E tests, docs, packaging |
+| 4. Server | Phase 2 | L | Approval server with REST + WebSocket + DB |
+| 5. Distribution | Phase 3,4 | M | deb, rpm, AUR, Homebrew, containers + CI |
+| 6. Approver UIs | Phase 4 | L | Web dashboard + desktop apps + IDE plugins |
+| 7. Integration | All | S | E2E tests, docs, final release |
 
 ---
 
@@ -63,6 +64,7 @@
 - [ ] WebSocket `/ws` - push new requests to connected approvers
 - [ ] Nonce cache (24h expiry) for replay prevention
 - [ ] Client/approver public key registry
+- [ ] Database backend (SQLite default, PostgreSQL optional)
 - [ ] TLS configuration
 - [ ] Audit logging to file
 
@@ -70,25 +72,101 @@
 
 ---
 
-## Phase 5: Approver UI
+## Phase 5: Distribution Packages
 
-- [ ] Web dashboard (single HTML + JS, served by rsudo-server)
-- [ ] WebSocket client for real-time request push
-- [ ] Request list: command, host, user, timestamp
-- [ ] Approve/Reject buttons with signature
-- [ ] Session auth (token-based, pre-authenticated)
+### `rsudo` package (CLI)
 
-**Deliverable**: Browser-based approval workflow
+- [ ] deb package (cargo-deb or debian/ directory)
+- [ ] rpm package (cargo-rpm or spec file)
+- [ ] AUR PKGBUILD (Arch Linux)
+- [ ] Homebrew formula (macOS)
+- [ ] Optional: Nix derivation, Alpine apk
+
+### `rsudo-server` package
+
+- [ ] deb/rpm packages (same tooling as CLI)
+- [ ] Docker image (multi-stage build, distroless base)
+- [ ] Docker Compose example with PostgreSQL
+
+### `rsudo-approver` package (Desktop App)
+
+- [ ] Flatpak (Flathub)
+
+### IDE Plugins
+
+- [ ] VS Code extension: publish to VS Code Marketplace
+- [ ] JetBrains plugin: publish to JetBrains Marketplace
+
+### Package contents
+
+| Component | Path |
+|-----------|------|
+| CLI binary | `/usr/bin/rsudo` |
+| Server binary | `/usr/bin/rsudo-server` |
+| sudoers config | `/etc/sudoers.d/rsudo` |
+| Config directory | `/etc/rsudo/` |
+| Drop-in directory | `/etc/rsudo.d/` |
+| Default config | `/etc/rsudo/config.toml` |
+| Log directory | `/var/log/rsudo/` |
+
+### CI/CD automation
+
+- [ ] GitHub Actions workflow: build packages on release tag
+- [ ] Cross-compilation: x86_64, aarch64
+- [ ] Package signing (GPG for deb/rpm)
+- [ ] Container registry push (ghcr.io)
+
+### Install scripts
+
+- [ ] `install.sh` for manual binary installation
+- [ ] Post-install hooks: create directories, set permissions
+
+**Deliverable**: Installable packages for major Linux distros + container images
 
 ---
 
-## Phase 6: Integration
+## Phase 6: Approver UIs
+
+Per spec §5, approvers need multiple interfaces for real-time approval.
+
+### Web Dashboard (served by rsudo-server)
+
+- [ ] Single HTML + JS bundle, embedded in server binary
+- [ ] WebSocket client for real-time request push
+- [ ] Web Push Notifications (browser popup when tab not focused)
+- [ ] Request list: command, host, user, timestamp
+- [ ] Approve/Reject buttons with signature
+- [ ] OAuth login flow for approver authentication
+
+### Desktop App (`rsudo-approver`)
+
+- [ ] GTK4 tray app for Linux (libadwaita for GNOME integration)
+- [ ] System notifications with approve/reject actions
+- [ ] WebSocket connection to server for push notifications
+- [ ] Approver enrollment via OAuth device flow
+
+### IDE Plugins
+
+- [ ] VS Code extension: popup notifications, approve/reject commands
+- [ ] JetBrains plugin: same functionality
+
+### Common approver features
+
+- [ ] Approver keypair generation and storage
+- [ ] Request signing on approval
+- [ ] Session management (auto-reconnect, token refresh)
+- [ ] Notification channel priority (see spec §5)
+
+**Deliverable**: Web UI + desktop notification apps for quick approvals
+
+---
+
+## Phase 7: Integration
 
 - [ ] E2E test: CLI → Server → UI → approve → execute
 - [ ] E2E test: SSR flow (offline signing)
 - [ ] E2E test: timeout and rejection paths
 - [ ] README with quickstart
 - [ ] Binary release workflow (tar.gz)
-- [ ] Docker image for server
 
 **Deliverable**: Release-ready v0.1.0
