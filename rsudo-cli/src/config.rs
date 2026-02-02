@@ -231,11 +231,17 @@ pub fn set_config(key: &str, value: &str) -> i32 {
         }
     }
 
+    // Serialize config
+    let config_str = match toml::to_string_pretty(&config) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("rsudoctl: failed to serialize config: {}", e);
+            return 3;
+        }
+    };
+
     // Write config
-    match std::fs::write(
-        &config_path,
-        toml::to_string_pretty(&config).unwrap_or_default(),
-    ) {
+    match std::fs::write(&config_path, config_str) {
         Ok(()) => {
             eprintln!("✅ Set {} = {} in {}", key, value, config_path.display());
             0
