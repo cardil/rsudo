@@ -140,12 +140,14 @@ impl ConfigLoader {
             }
         }
 
-        // Audit config - always mergeable
-        if overlay.audit.log_file.is_some() {
-            base.audit.log_file = overlay.audit.log_file;
-        }
-        if overlay.audit.syslog.is_some() {
-            base.audit.syslog = overlay.audit.syslog;
+        // Audit config - security-critical, not overridable by user
+        if !is_user_config {
+            if overlay.audit.log_file.is_some() {
+                base.audit.log_file = overlay.audit.log_file;
+            }
+            if overlay.audit.syslog.is_some() {
+                base.audit.syslog = overlay.audit.syslog;
+            }
         }
 
         // Request config - always mergeable
@@ -373,7 +375,11 @@ log_file = "/tmp/audit.log"
             config.client.key_file,
             Some("/home/user/.rsudo/key".to_string())
         );
+        // Audit config from system should NOT be overridden by user config
         assert_eq!(config.audit.syslog, Some(true));
-        assert_eq!(config.audit.log_file, Some("/tmp/audit.log".to_string()));
+        assert_eq!(
+            config.audit.log_file,
+            Some("/var/log/rsudo/audit.log".to_string())
+        );
     }
 }

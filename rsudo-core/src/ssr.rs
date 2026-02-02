@@ -101,7 +101,7 @@ impl SignRequestToken {
         // Extract base64 content between BEGIN and END markers
         let lines: Vec<&str> = pem.lines().collect();
 
-        // Find BEGIN and END markers
+        // Find BEGIN and END markers and validate they match
         let begin_idx = lines
             .iter()
             .position(|line| {
@@ -109,12 +109,22 @@ impl SignRequestToken {
             })
             .ok_or_else(|| SsrError::InvalidFormat("Missing BEGIN marker".to_string()))?;
 
+        let is_invocation = lines[begin_idx].contains("INVOCATION");
+
         let end_idx = lines
             .iter()
             .position(|line| {
                 line.contains("END RSUDO SIGN REQUEST") || line.contains("END RSUDO INVOCATION")
             })
             .ok_or_else(|| SsrError::InvalidFormat("Missing END marker".to_string()))?;
+
+        // Validate that BEGIN and END markers match
+        let end_is_invocation = lines[end_idx].contains("INVOCATION");
+        if is_invocation != end_is_invocation {
+            return Err(SsrError::InvalidFormat(
+                "Mismatched BEGIN/END markers".to_string(),
+            ));
+        }
 
         if end_idx <= begin_idx {
             return Err(SsrError::InvalidFormat("Invalid PEM structure".to_string()));
@@ -301,6 +311,20 @@ mod tests {
         let encoded = STANDARD.encode(wrong_json.as_bytes());
         let pem = format!(
             "-----BEGIN RSUDO SIGN REQUEST-----\n{}\n-----END RSUDO SIGN REQUEST-----\n",
+            encoded
+        );
+        let result = SignRequestToken::from_pem(&pem);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_invalid_pem_mismatched_markers() {
+        // BEGIN and END markers don't match
+        let request = create_test_request();
+        let token = SignRequestToken::new(request);
+        let encoded = STANDARD.encode(serde_json::to_string(&token).unwrap().as_bytes());
+        let pem = format!(
+            "-----BEGIN RSUDO SIGN REQUEST-----\n{}\n-----END RSUDO INVOCATION-----\n",
             encoded
         );
         let result = SignRequestToken::from_pem(&pem);
