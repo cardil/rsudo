@@ -279,6 +279,10 @@ fn glob_match(pattern: &str, text: &str) -> bool {
         if parts.len() == 2 {
             let prefix = parts[0];
             let suffix = parts[1];
+            // Ensure text is long enough to contain both prefix and suffix without overlap
+            if text.len() < prefix.len() + suffix.len() {
+                return false;
+            }
             return text.starts_with(prefix) && text.ends_with(suffix);
         }
     }
@@ -315,6 +319,13 @@ mod tests {
         assert!(glob_match("exact", "exact"));
         assert!(!glob_match("prod-*", "dev-server"));
         assert!(!glob_match("exact", "different"));
+
+        // Test for overlapping prefix/suffix bug fix
+        assert!(!glob_match("prod-*-east", "prod-east")); // Should not match - overlapping
+        assert!(glob_match("prod-*-east", "prod-server-east")); // Should match
+        assert!(glob_match("a*z", "az")); // Minimum length match (wildcard matches empty)
+        assert!(glob_match("a*z", "abz")); // Should match with one char in middle
+        assert!(glob_match("ab*yz", "abyz")); // Should match - wildcard matches empty
     }
 
     #[test]

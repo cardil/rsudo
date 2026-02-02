@@ -223,7 +223,11 @@ pub async fn submit_hanging_request(
     timeout: u64,
 ) -> Result<String, RequestError> {
     let session = load_session()?;
-    let client = Client::new();
+
+    // Configure client with timeout to prevent indefinite blocking
+    let client = Client::builder()
+        .timeout(Duration::from_secs(timeout + 10)) // Add buffer for network overhead
+        .build()?;
 
     println!("🔐 Requesting approval...");
     println!("   Command: {} {}", request.command, request.args.join(" "));
